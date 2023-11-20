@@ -1,14 +1,11 @@
-#ifndef __COUNTING_DATA_H
-#define __COUNTING_DATA_H
-
-#ifndef __COUNTING_IS_THREADED
-#error                                                                         \
-    "It is not known whether the instrumentation counting is threaded or not."
-#endif
+#ifndef __COUNTING_H
+#define __COUNTING_H
 
 #include "verilated.h"
 
 #include <bits/stdc++.h>
+#include <stdint.h>
+#include <atomic>
 #include <ctime>
 #include <format>
 #include <fstream>
@@ -17,10 +14,10 @@
 #include <stdint.h>
 #include <string>
 
-static std::time_t output_file_timestamp = std::time(nullptr);
-
 // Output the `value` with a `name` to the output file.
 void output_counter_value(const std::string name, const uint64_t value) {
+    static std::time_t output_file_timestamp = std::time(nullptr);
+    
     std::ofstream outfile;
 
     std::stringstream path;
@@ -34,9 +31,11 @@ void output_counter_value(const std::string name, const uint64_t value) {
     outfile << name << ": " << value << std::endl;
 }
 
-#if __COUNTING_IS_THREADED == 1
-#include <atomic>
-
+// We have both a program wide counter and a thread local counter.
+//
+// This allows additions to be really cheap and not need atomic operations,
+// while we can just sync it at the end into the global counter with
+// destructors.
 class GlobalCounter;
 class ThreadCounter;
 
@@ -73,24 +72,10 @@ class ThreadCounter {
 GlobalCounter __bf_glob_counter = GlobalCounter();
 thread_local ThreadCounter __bf_counter = ThreadCounter();
 
-#else
-class Counter {
-  private:
-    uint64_t value;
-
-  public:
-    Counter() : value(0) {}
-    Counter &operator+=(const uint64_t &addition) {
-        this->value += addition;
-        return *this;
-    }
-
-    ~Counter() { output_counter_value("flipflop toggles", this->value); }
-};
-
-static Counter __bf_counter = Counter();
-#endif
-
+// This macro defines all the CountingXData types.
+//
+// All this logic is the same between types. It adds the Hamming distance with
+// the previous value to the thread counter when an assignment is done.
 #define DEFINE_COUNTING_TYPE(NEW_TYPE, BASE_TYPE)                              \
     class NEW_TYPE {                                                           \
       private:                                                                 \
@@ -102,7 +87,8 @@ static Counter __bf_counter = Counter();
         operator BASE_TYPE() const { return (BASE_TYPE)this->data; }           \
         NEW_TYPE &operator=(const NEW_TYPE &other) {                           \
             BASE_TYPE bitdiff = this->data ^ other.data;                       \
-            __bf_counter += __builtin_popcount(bitdiff);                       \
+            uint64_t hamming_distance = __builtin_popcount(bitdiff);           \
+            __bf_counter += hamming_distance;                                  \
             data = other.data;                                                 \
             return *this;                                                      \
         }                                                                      \
@@ -113,4 +99,4 @@ DEFINE_COUNTING_TYPE(CountingSData, SData)
 DEFINE_COUNTING_TYPE(CountingIData, IData)
 DEFINE_COUNTING_TYPE(CountingQData, QData)
 
-#endif // __COUNTING_DATA_H
+#endif // __COUNTING_H

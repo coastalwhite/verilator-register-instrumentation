@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
 import os
+import time
 import sys, argparse
 
 def main():
+    time_start = time.perf_counter()
+
     parser = argparse.ArgumentParser(
         prog = 'VerilatorRegisterInstrument',
         description = 'Instrument Verilator CPP code with register information',
@@ -26,7 +29,7 @@ def main():
         for file in files:
             _, ext = os.path.splitext(file)
 
-            if file == 'counting_data.h':
+            if file == 'counting.h':
                 continue
             
             if ext == '.h':
@@ -39,16 +42,11 @@ def main():
         'QData',
     ]
 
+    instrumented = 0
     for file in header_files:
         with open(file, 'r') as f:
             updated = False
             lines = f.readlines()
-
-            # Find out whether the module is threaded or not. If so we have to add different types.
-            is_threaded = False
-            for i, line in enumerate(lines):
-                if line.strip() == '#include "verilated_threads.h"':
-                    is_threaded = True;
 
             for i, line in enumerate(lines):
                 stripped = line.strip()
@@ -83,14 +81,7 @@ def main():
             found = False
             for i, line in enumerate(lines):
                 if line.strip() == '#include "verilated.h"':
-                    if is_threaded:
-                        is_threaded_value = '1'
-                    else:
-                        is_threaded_value = '0'
-
-                    lines.insert(i, '#undef __COUNTING_IS_THREADED\n')
-                    lines.insert(i, '#include "counting_data.h"\n')
-                    lines.insert(i, f'#define __COUNTING_IS_THREADED {is_threaded_value}\n')
+                    lines.insert(i, f'#include "counting.h"\n')
 
                     found = True;
                     break;
@@ -101,6 +92,17 @@ def main():
             
             with open(file, 'w') as f:
                 f.writelines(lines)
+
+            print(f"Instrumented {file}")
+            instrumented += 1
+        else:
+            print(f"Skipping     {file}")
+
+    time_end = time.perf_counter()
+    time_diff = time_end - time_start
+    print("")
+    print(f"Instrumented {instrumented}/{len(header_files)} header files")
+    print(f"Completed in {time_diff:0.4f} seconds")
 
 if __name__ == "__main__":
     main()
