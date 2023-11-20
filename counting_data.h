@@ -1,53 +1,73 @@
 #ifndef __COUNTING_DATA_H
 #define __COUNTING_DATA_H
 
-#include "verilated.h"
-#include <iostream>
-
 #ifndef __COUNTING_IS_THREADED
-#error "It is not known whether the instrumentation counting is threaded or not."
+#error                                                                         \
+    "It is not known whether the instrumentation counting is threaded or not."
 #endif
+
+#include "verilated.h"
+
+#include <bits/stdc++.h>
+#include <ctime>
+#include <format>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdint.h>
+#include <string>
+
+static std::time_t output_file_timestamp = std::time(nullptr);
+
+// Output the `value` with a `name` to the output file.
+void output_counter_value(const std::string name, const uint64_t value) {
+    std::ofstream outfile;
+
+    std::stringstream path;
+    path << "./countout-";
+    path << output_file_timestamp;
+
+    std::string path_str;
+    path >> path_str;
+
+    outfile.open(path_str, std::ios_base::app);
+    outfile << name << ": " << value << std::endl;
+}
 
 #if __COUNTING_IS_THREADED == 1
 #include <atomic>
 
-class GlobalCounter ;
-class ThreadCounter ;
+class GlobalCounter;
+class ThreadCounter;
 
 extern GlobalCounter __bf_glob_counter;
 
 class GlobalCounter {
-private:
-	std::atomic_uint64_t value;
-	std::atomic_uint num_written;
-public:
-    GlobalCounter() :  value(0), num_written(0) {}
-    GlobalCounter& operator+= (const uint64_t& rhs)
-    {
+  private:
+    std::atomic_uint64_t value;
+
+  public:
+    GlobalCounter() : value(0) {}
+    GlobalCounter &operator+=(const uint64_t &rhs) {
         this->value += rhs;
-		this->num_written += 1;
         return *this;
     }
-    
-    ~GlobalCounter() {
-		std::cout << "Counter: " << this->value << std::endl;
-    }
+
+    ~GlobalCounter() { output_counter_value("flipflop toggles", this->value); }
 };
 
 class ThreadCounter {
-private:
+  private:
     uint64_t value;
-public:
+
+  public:
     ThreadCounter() : value(0) {}
-    ThreadCounter& operator+= (const uint64_t& rhs)
-    {
+    ThreadCounter &operator+=(const uint64_t &rhs) {
         this->value += rhs;
         return *this;
     }
-    
-    ~ThreadCounter() {
-		__bf_glob_counter += this->value;
-    }
+
+    ~ThreadCounter() { __bf_glob_counter += this->value; }
 };
 
 GlobalCounter __bf_glob_counter = GlobalCounter();
@@ -55,86 +75,42 @@ thread_local ThreadCounter __bf_counter = ThreadCounter();
 
 #else
 class Counter {
-private:
+  private:
     uint64_t value;
-public:
+
+  public:
     Counter() : value(0) {}
-    Counter& operator+= (const uint64_t& addition)
-    {
+    Counter &operator+=(const uint64_t &addition) {
         this->value += addition;
         return *this;
     }
-    
-    ~Counter() {
-        std::cout << "Counter: " << this->value << std::endl;
-    }
+
+    ~Counter() { output_counter_value("flipflop toggles", this->value); }
 };
 
 static Counter __bf_counter = Counter();
 #endif
 
-#include <bits/stdc++.h>
-#include <stdint.h>
-#include <iostream>
+#define DEFINE_COUNTING_TYPE(NEW_TYPE, BASE_TYPE)                              \
+    class NEW_TYPE {                                                           \
+      private:                                                                 \
+        BASE_TYPE data;                                                        \
+                                                                               \
+      public:                                                                  \
+        NEW_TYPE() : data(0) {}                                                \
+        NEW_TYPE(BASE_TYPE i) : data(i) {}                                     \
+        operator BASE_TYPE() const { return (BASE_TYPE)this->data; }           \
+        NEW_TYPE &operator=(const NEW_TYPE &other) {                           \
+            BASE_TYPE bitdiff = this->data ^ other.data;                       \
+            __bf_counter += __builtin_popcount(bitdiff);                       \
+            data = other.data;                                                 \
+            return *this;                                                      \
+        }                                                                      \
+    };
 
-class CountingCData {
-private:
-    CData data;
-public:
-    CountingCData() : data(0) {}
-    CountingCData(CData i) : data(i) {}
-    operator CData() const { return (CData)this->data; }
-    CountingCData& operator=(const CountingCData& other)
-    {
-        __bf_counter += __builtin_popcount(this->data ^ other.data);
-        data = other.data;
-        return *this;
-    }
-};
-
-class CountingSData {
-private:
-    SData data;
-public:
-    CountingSData() : data(0) {}
-    CountingSData(SData i) : data(i) {}
-    operator SData() const { return (SData)this->data; }
-    CountingSData& operator=(const CountingSData& other)
-    {
-        __bf_counter += __builtin_popcount(this->data ^ other.data);
-        data = other.data;
-        return *this;
-    }
-};
-
-class CountingIData {
-private:
-    IData data;
-public:
-    CountingIData() : data(0) {}
-    CountingIData(IData i) : data(i) {}
-    operator IData() const { return (IData)this->data; }
-    CountingIData& operator=(const CountingIData& other)
-    {
-        __bf_counter += __builtin_popcount(this->data ^ other.data);
-        data = other.data;
-        return *this;
-    }
-};
-
-class CountingQData {
-private:
-    QData data;
-public:
-    CountingQData() : data(0) {}
-    CountingQData(QData i) : data(i) {}
-    operator QData() const { return (QData)this->data; }
-    CountingQData& operator=(const CountingQData& other)
-    {
-        __bf_counter += __builtin_popcount(this->data ^ other.data);
-        data = other.data;
-        return *this;
-    }
-};
+DEFINE_COUNTING_TYPE(CountingCData, CData)
+DEFINE_COUNTING_TYPE(CountingSData, SData)
+DEFINE_COUNTING_TYPE(CountingIData, IData)
+DEFINE_COUNTING_TYPE(CountingQData, QData)
 
 #endif // __COUNTING_DATA_H
