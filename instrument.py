@@ -81,7 +81,7 @@ def main():
             found = False
             for i, line in enumerate(lines):
                 if line.strip() == '#include "verilated.h"':
-                    lines.insert(i, f'#include "counting.h"\n')
+                    lines.insert(i, f'#include "counting.hpp"\n')
 
                     found = True;
                     break;
