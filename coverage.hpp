@@ -23,6 +23,6 @@ class CoverageMap {
     ~CoverageMap();
 };
 
-extern CoverageMap __tl_coverage_map;
+extern CoverageMap __vri_covmap;
 
 #endif // _COVERAGE_H

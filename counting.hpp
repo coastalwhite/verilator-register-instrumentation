@@ -25,6 +25,6 @@ class BitFlipCounter {
 // > completions of the destructors for all initialized objects with thread
 // > storage duration within that thread are sequenced before the initiation of
 // > the destructors of any object with static storage duration.
-extern BitFlipCounter __bf_counter;
+extern BitFlipCounter __vri_bfcntr;
 
 #endif // __COUNTING_H
