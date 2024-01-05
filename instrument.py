@@ -124,8 +124,6 @@ def instrument_assignment(assignment, fields):
         
         lvalue = lvalue.name
 
-    print(lvalue)
-
     if lvalue.name.name != "vlSelf":
         return
 
@@ -383,7 +381,10 @@ def main():
                         parser = c_parser.CParser()
                         try:
                             ast = parser.parse(fndecl)
-                        except:
+                        except Exception as error:
+                            print("Failed to parse AST")
+                            print(error)
+                            print()
                             print(fndecl)
                             exit(1)
 

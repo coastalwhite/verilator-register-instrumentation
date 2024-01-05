@@ -19,8 +19,11 @@ class CoverageMap {
 
   public:
     CoverageMap();
-    void AddPoint(uint64_t cur_location);
     ~CoverageMap();
+
+    void AddPoint(uint64_t cur_location);
+
+    uint8_t* Compress();
 };
 
 extern CoverageMap __vri_covmap;
